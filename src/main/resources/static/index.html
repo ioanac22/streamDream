@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamDream - Catalog</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@4/dark.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="stars"></div>
+<div id="notification-toast">Added to your Watchlist! 💜</div>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4 py-3 shadow-sm custom-nav">
+    <div class="container">
+        <a class="navbar-brand fw-bold fst-italic" href="index.html">💜 StreamDream</a>
+        <div class="navbar-nav ms-auto" id="dynamic-menu">
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <select id="genreFilter" class="form-select bg-dark text-light border-secondary">
+                <option value="all">Filter: All Content</option>
+                <option value="Action">Action</option>
+                <option value="Adventure">Adventure</option>
+                <option value="Animation">Animation</option>
+                <option value="Documentary">Documentary</option>
+                <option value="Drama">Drama</option>
+                <option value="Comedy">Comedy</option>
+                <option value="Horror">Horror</option>
+                <option value="Biography">Biography</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="media-list" class="row pb-5"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+<script>
+    const API_BASE = "http://localhost:8080/api/media";
+
+    // --- PASUL 1: CINE E LOGAT? ---
+    const storedUser = localStorage.getItem('user');
+    const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
+    // --- PASUL 2: ACTUALIZĂM NAVBAR-UL (CU POZĂ) ---
+    function updateNavbar() {
+        // Am schimbat selectorul ca să fiu sigur că nimeresc unde trebuie
+        const navContainer = document.getElementById('dynamic-menu');
+
+        if (currentUser) {
+            // E LOGAT - Verificăm dacă are poză
+            // Dacă are poză -> tag <img>. Dacă nu -> emoji 👤
+            const userAvatar = currentUser.avatarUrl
+                ? `<img src="${currentUser.avatarUrl}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid #e0aaff;">`
+                : '<span style="font-size: 1.5rem;">👤</span>';
+
+            let adminLink = currentUser.role === 'admin'
+                ? `<a href="admin.html" class="btn btn-sm btn-danger ms-3 rounded-pill">🛡️ Admin</a>`
+                : '';
+
+            navContainer.innerHTML = `
+                <a class="nav-link active" href="index.html">Catalog</a>
+                <a class="nav-link" href="watchlist.html">My Watchlist</a>
+                <a class="nav-link" href="history.html">History</a>
+
+                <a href="profile.html" class="nav-link text-white ms-2 d-flex align-items-center gap-2" style="text-decoration: none;">
+                    ${userAvatar}
+                    <span class="fw-bold">${currentUser.username}</span>
+                </a>
+
+                ${adminLink}
+                <button onclick="logout()" class="btn btn-sm btn-outline-light ms-3 rounded-pill">Log Out</button>
+            `;
+        } else {
+            // E VIZITATOR (GUEST)
+            navContainer.innerHTML = `
+                <a class="nav-link active" href="index.html">Catalog</a>
+                <a href="login.html" class="btn btn-dreamy ms-3 rounded-pill px-4">Log In</a>
+            `;
+        }
+    }
+
+    // --- PASUL 3: LOGOUT ---
+    function logout() {
+        localStorage.removeItem('user');
+        window.location.reload();
+    }
+
+    // --- PASUL 4: WATCHLIST ---
+    async function addToWatchlist(mediaId) {
+        if (!currentUser) {
+            Swal.fire({
+                icon: 'warning', title: 'Login Required', text: 'You need an account to create a watchlist!',
+                background: '#240046', color: '#fff', showCancelButton: true,
+                confirmButtonText: 'Create Account', confirmButtonColor: '#7b2cbf'
+            }).then((result) => {
+                if (result.isConfirmed) window.location.href = 'register.html';
+            });
+            return;
+        }
+
+        try {
+            const userId = currentUser.userId || currentUser.id;
+            const res = await fetch(`http://localhost:8080/api/watchlist/add?userId=${userId}&mediaId=${mediaId}`, { method: 'POST' });
+
+            if(res.ok) {
+                const toast = document.getElementById("notification-toast");
+                toast.className = "show";
+                setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+            } else {
+                const text = await res.text();
+                Swal.fire({icon: 'info', title: 'Info', text: text, background: '#240046', color: '#fff'});
+            }
+        } catch (error) {
+            console.error("Eroare:", error);
+        }
+    }
+
+    // --- LOAD MEDIA ---
+    async function loadMedia(genre = 'all') {
+        const url = genre === 'all' ? `${API_BASE}/all` : `${API_BASE}/search?genre=${genre}`;
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            const container = document.getElementById('media-list');
+
+            container.innerHTML = data.map(m => `
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100 card-dreamy">
+                        <img src="${m.posterUrl}" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x450?text=No+Image';" class="card-img-top" style="height:350px; object-fit:cover;">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="fw-bold text-truncate">${m.title}</h5>
+                            <div class="mb-3">
+                                <span class="badge bg-purple">${m.genre || 'Movie'}</span>
+                                <small class="text-white-50 ms-2">${m.releaseYear}</small>
+                            </div>
+                            <button onclick="addToWatchlist(${m.mediaId})" class="btn btn-dreamy mt-auto rounded-pill w-100">
+                                + Add to Watchlist
+                            </button>
+                            <a href="reviews.html?mediaId=${m.mediaId}&title=${encodeURIComponent(m.title)}&poster=${encodeURIComponent(m.posterUrl)}"
+                               class="btn btn-outline-light mt-2 rounded-pill w-100">
+                                ⭐ Rate & Review
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch(e) { console.error("Nu am putut încărca filmele", e); }
+    }
+
+    // Inițializare
+    updateNavbar();
+    loadMedia();
+    document.getElementById('genreFilter').addEventListener('change', (e) => loadMedia(e.target.value));
+
+</script>
+</body>
+</html>

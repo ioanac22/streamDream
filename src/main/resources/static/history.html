@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamDream - History</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@4/dark.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* 1. Facem tabelul transparent (să nu mai fie alb) */
+        .table, .table tbody, .table td, .table th, .table tr {
+            background-color: transparent !important;
+            color: #e0aaff !important; /* Scris lila */
+            border-color: #5a189a !important; /* Linii mov */
+        }
+
+        /* 2. Facem cardul semi-transparent */
+        .card-dreamy {
+            background-color: rgba(36, 0, 70, 0.6) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid #5a189a;
+        }
+
+        /* 3. Efect la mouse peste rânduri */
+        tbody tr:hover {
+            background-color: rgba(157, 78, 221, 0.1) !important;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4 py-3 shadow-sm custom-nav">
+    <div class="container">
+        <a class="navbar-brand fw-bold fst-italic" href="index.html">💜 StreamDream</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto" id="dynamic-menu"></div>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h2 class="text-white fw-bold mb-4">📜 Watch History & Reviews</h2>
+    <div class="card card-dreamy p-3">
+        <div class="table-responsive">
+            <table class="table table-borderless align-middle mb-0">
+                <thead class="border-bottom border-secondary small text-white-50 text-uppercase">
+                <tr>
+                    <th>Poster</th>
+                    <th>Title</th>
+                    <th>My Review</th>
+                    <th>Rating</th>
+                    <th>Date</th>
+                    <th class="text-end">Action</th>
+                </tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+<script>
+    // --- 1. NAVBAR LOGIC (Design Centrat & Simetric) ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const storedUser = localStorage.getItem('user');
+        const navContainer = document.getElementById('dynamic-menu');
+
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+
+            // Avatar
+            const userAvatar = user.avatarUrl
+                ? `<img src="${user.avatarUrl}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid #e0aaff;">`
+                : '<span style="font-size: 1.5rem;">👤</span>';
+
+            // Buton Admin Mic
+            const adminButton = user.role === 'admin'
+                ? `<a href="admin.html" class="btn btn-sm btn-danger rounded-pill px-2 py-0 fw-bold d-flex align-items-center" style="font-size: 0.7rem; height: 25px;">ADMIN</a>`
+                : '';
+
+            // --- HTML PENTRU NAVBAR CENTRAT ---
+            navContainer.className = "navbar-nav ms-auto d-flex flex-row align-items-center gap-4"; // Flexbox magic
+
+            navContainer.innerHTML = `
+                <div class="d-flex align-items-center gap-3">
+                    <a class="nav-link text-white fw-bold" href="index.html">Catalog</a>
+                    <a class="nav-link text-white fw-bold" href="watchlist.html">My Watchlist</a>
+                    <a class="nav-link text-white fw-bold active" href="history.html">History</a>
+                </div>
+
+                <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.3);"></div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <a href="profile.html" class="text-decoration-none d-flex align-items-center gap-2 text-white">
+                        ${userAvatar}
+                        <span class="fw-bold small">${user.username}</span>
+                    </a>
+                    ${adminButton}
+                    <button onclick="logout()" class="btn btn-sm btn-outline-light rounded-pill px-3 py-1" style="font-size: 0.8rem;">Log Out</button>
+                </div>
+            `;
+
+            loadHistory(user.userId || user.id);
+        } else {
+            window.location.href = 'login.html';
+        }
+    });
+
+    // --- 2. LOAD HISTORY ---
+    async function loadHistory(userId) {
+        try {
+            const res = await fetch(`http://localhost:8080/api/reviews/user/${userId}`);
+            if (!res.ok) throw new Error("Failed to load reviews");
+            const reviews = await res.json();
+            const tbody = document.getElementById('history-body');
+
+            if(reviews.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-white-50"><h4>No reviews yet. Start watching! 🍿</h4></td></tr>`;
+                return;
+            }
+
+            // Inversăm lista (cele mai noi sus)
+            reviews.reverse();
+
+            tbody.innerHTML = reviews.map(r => {
+                // Formare dată
+                let dateStr = "Recently";
+                if(r.createdAt) {
+                    const d = r.createdAt;
+                    dateStr = Array.isArray(d) ? `${d[2]}/${d[1]}/${d[0]}` : new Date(d).toLocaleDateString('en-GB');
+                }
+
+                // Culoare rating
+                let badgeColor = 'bg-danger';
+                if(r.rating >= 8) badgeColor = 'bg-success';
+                else if(r.rating >= 5) badgeColor = 'bg-warning text-dark';
+
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <td class="py-3"><img src="${r.media.posterUrl}" style="height: 60px; width: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #9d4edd;"></td>
+                        <td class="fw-bold text-white">${r.media.title}</td>
+                        <td class="text-white-50 fst-italic">"${r.comment || 'No comment'}"</td>
+                        <td><span class="badge ${badgeColor} p-2 rounded-pill">${r.rating}/10</span></td>
+                        <td class="text-white-50 small">${dateStr}</td>
+                        <td class="text-end">
+                            <button onclick="deleteReview(${r.reviewId})" class="btn btn-sm btn-outline-danger rounded-pill px-3">🗑️ Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (e) {
+            console.error(e);
+            document.getElementById('history-body').innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error loading history.</td></tr>`;
+        }
+    }
+
+    // --- 3. DELETE REVIEW ---
+    async function deleteReview(id) {
+        if(await Swal.fire({
+            title:'Delete review?',
+            text: "It will be removed from history.",
+            icon:'warning',
+            showCancelButton:true,
+            confirmButtonColor: '#d33',
+            background:'#240046', color:'#fff'
+        }).then(r => r.isConfirmed)){
+            await fetch(`http://localhost:8080/api/reviews/delete/${id}`, {method:'DELETE'});
+            location.reload();
+        }
+    }
+
+    function logout() { localStorage.removeItem('user'); window.location.href = 'login.html'; }
+</script>
+</body>
+</html>

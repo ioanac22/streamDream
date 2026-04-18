@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - StreamDream</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@4/dark.css" rel="stylesheet">
+    <style>
+        body { background-color: #10002b; color: #e0aaff; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .stars { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('https://www.transparenttextures.com/patterns/stardust.png'); animation: moveStars 100s linear infinite; z-index: -1; opacity: 0.5; }
+        @keyframes moveStars { from {background-position: 0 0;} to {background-position: 1000px 1000px;} }
+        .card-dreamy { background: rgba(36, 0, 70, 0.9); border: 2px solid #7b2cbf; box-shadow: 0 0 30px rgba(123, 44, 191, 0.4); color: white; backdrop-filter: blur(10px); }
+        .form-control { background-color: #10002b !important; border: 1px solid #5a189a !important; color: white !important; }
+        .form-control:focus { box-shadow: 0 0 15px #9d4edd; border-color: #e0aaff !important; }
+        .btn-dreamy { background: linear-gradient(45deg, #7b2cbf, #9d4edd); color: white; border: none; font-weight: bold; width: 100%; padding: 10px; border-radius: 50px; }
+        .btn-dreamy:hover { box-shadow: 0 0 25px #9d4edd; transform: scale(1.05); }
+        a { color: #e0aaff; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="stars"></div>
+<div class="card card-dreamy p-5 rounded-4" style="width: 400px;">
+    <h2 class="text-center mb-4 fw-bold">Welcome Back 💜</h2>
+    <form onsubmit="handleLogin(event)">
+        <div class="mb-3"><label class="small text-white-50">Username</label><input type="text" id="username" class="form-control" required></div>
+        <div class="mb-4"><label class="small text-white-50">Password</label><input type="password" id="password" class="form-control" required></div>
+        <button type="submit" class="btn btn-dreamy">Log In</button>
+    </form>
+    <div class="text-center mt-3"><a href="register.html">Create an Account</a></div>
+    <div class="text-center mt-2"><a href="index.html" class="small text-white-50">Go to Catalog</a></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+<script>
+    async function handleLogin(e) {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const res = await fetch('http://localhost:8080/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, password })
+            });
+
+            if (res.ok) {
+                const user = await res.json();
+
+                // AICI E SECRETUL: Salvăm userul în browser
+                localStorage.setItem('user', JSON.stringify(user));
+
+                Swal.fire({
+                    icon: 'success', title: 'Welcome!', text: 'Logging in...',
+                    timer: 1500, showConfirmButton: false, background: '#240046', color: '#fff'
+                }).then(() => {
+                    if(user.role === 'admin') window.location.href = 'admin.html';
+                    else window.location.href = 'index.html';
+                });
+            } else {
+                const msg = await res.text();
+                Swal.fire({icon: 'error', title: 'Login Failed', text: msg, background: '#240046', color: '#fff'});
+            }
+        } catch (err) { console.error(err); }
+    }
+</script>
+</body>
+</html>
